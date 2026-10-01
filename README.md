@@ -26,11 +26,11 @@ con dati di laboratorio e li lascia nel database. Può essere ripetuto.
 La directory `.secrets` e `.env` vengono creati una volta e sono esclusi da Git.
 Non condividere `.env`, chiavi private o token.
 
-Il gateway è raggiungibile solo da questo computer: http://localhost:8080.
+Il gateway è raggiungibile solo da questo computer: http://localhost:8088.
 PostgreSQL e i tre servizi non espongono porte sull'host.
 
 ```bash
-curl -i http://localhost:8080/actuator/health/readiness
+curl -i http://localhost:8088/actuator/health/readiness
 docker compose logs --tail=100 order-service
 docker compose logs --tail=100 customer-service
 docker compose stop

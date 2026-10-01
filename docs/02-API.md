@@ -1,6 +1,6 @@
 # API v0.1
 
-Tutte le chiamate passano da `http://localhost:8080`.
+Tutte le chiamate passano da `http://localhost:8088`.
 
 | Metodo e path | Input / comportamento | Risultato |
 |---|---|---|
@@ -31,14 +31,14 @@ set +a
 LOGIN_JSON=$(python3 -c 'import os,json; print(json.dumps({"username":os.environ["BOOTSTRAP_USERNAME"],"password":os.environ["BOOTSTRAP_PASSWORD"]}))')
 TOKEN=$(printf '%s' "$LOGIN_JSON" | curl --fail-with-body -sS \
   -H 'Content-Type: application/json' --data-binary @- \
-  http://localhost:8080/api/auth/login \
+  http://localhost:8088/api/auth/login \
   | python3 -c 'import sys,json; print(json.load(sys.stdin)["accessToken"])')
 unset LOGIN_JSON
 
 curl -i -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"Mario Rossi","email":"mario.rossi@example.com"}' \
-  http://localhost:8080/api/customers
+  http://localhost:8088/api/customers
 ```
 
 Prendi l'ID della risposta (non supporre che sia sempre 1), quindi:
@@ -48,10 +48,10 @@ CUSTOMER_ID=1 # sostituisci con il valore realmente ricevuto
 curl -i -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d "{\"customerId\":$CUSTOMER_ID,\"description\":\"Ordine di prova\",\"amount\":49.90}" \
-  http://localhost:8080/api/orders
+  http://localhost:8088/api/orders
 
 curl -i -H "Authorization: Bearer $TOKEN" \
-  'http://localhost:8080/api/orders?page=0&size=20'
+  'http://localhost:8088/api/orders?page=0&size=20'
 unset TOKEN BOOTSTRAP_PASSWORD
 ```
 

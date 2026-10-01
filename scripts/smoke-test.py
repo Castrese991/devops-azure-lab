@@ -4,7 +4,7 @@ import json, os, sys, time, uuid
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
-base=os.environ.get('BASE_URL','http://localhost:8080')
+base=os.environ.get('BASE_URL','http://localhost:8088')
 env={}
 p=Path(__file__).resolve().parent.parent/'.env'
 if p.exists():
