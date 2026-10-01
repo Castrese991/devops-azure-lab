@@ -1,0 +1,24 @@
+-------------------------------------------------------------------------------
+Test set: it.castrese.lab.api.GatewayTest
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 17.33 s -- in it.castrese.lab.api.GatewayTest
+
+-------------------------------------------------------------------------------
+Test set: it.castrese.lab.auth.AuthApiTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 14.91 s -- in it.castrese.lab.auth.AuthApiTest
+
+-------------------------------------------------------------------------------
+Test set: it.castrese.lab.customer.CustomerApiTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 22.19 s -- in it.castrese.lab.customer.CustomerApiTest
+
+-------------------------------------------------------------------------------
+Test set: it.castrese.lab.order.CustomerClientTest
+-------------------------------------------------------------------------------
+Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.538 s -- in it.castrese.lab.order.CustomerClientTest
+
+-------------------------------------------------------------------------------
+Test set: it.castrese.lab.order.OrderApiTest
+-------------------------------------------------------------------------------
+Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 18.14 s -- in it.castrese.lab.order.OrderApiTest

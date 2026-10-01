@@ -1,0 +1,10 @@
+**/target/
+.env
+.secrets/
+.idea/
+*.iml
+*.log
+__pycache__/
+*.pyc
+
+compose.yaml.backup-*

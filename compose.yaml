@@ -1,0 +1,142 @@
+name: devops-azure-lab
+services:
+  postgres:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run init-local.sh}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Run init-local.sh}
+      CUSTOMER_DB_PASSWORD: ${CUSTOMER_DB_PASSWORD:?Run init-local.sh}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:?Run init-local.sh}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/01-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    image: devops-lab/api-gateway:local
+    environment:
+      SERVER_PORT: 8080
+      AUTH_BASE_URL: http://auth-service:8080
+      CUSTOMER_BASE_URL: http://customer-service:8080
+      ORDER_BASE_URL: http://order-service:8080
+    ports:
+      - "127.0.0.1:8088:8080"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      customer-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    mem_limit: 768m
+    cpus: 1.0
+    stop_grace_period: 30s
+    cap_drop:
+      - ALL
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    image: devops-lab/auth-service:local
+    environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:postgresql://postgres:5432/auth_db
+      DB_USER: auth_app
+      DB_PASSWORD: ${AUTH_DB_PASSWORD:?Run init-local.sh}
+      JWT_PUBLIC_KEY: file:/run/secrets/jwt_public
+      JWT_PRIVATE_KEY: file:/run/secrets/jwt_private
+      BOOTSTRAP_USERNAME: ${BOOTSTRAP_USERNAME:?Run init-local.sh}
+      BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:?Run init-local.sh}
+    secrets:
+      - jwt_public
+      - jwt_private
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    mem_limit: 768m
+    cpus: 1.0
+    stop_grace_period: 30s
+    cap_drop:
+      - ALL
+  customer-service:
+    build:
+      context: .
+      dockerfile: customer-service/Dockerfile
+    image: devops-lab/customer-service:local
+    environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:postgresql://postgres:5432/customer_db
+      DB_USER: customer_app
+      DB_PASSWORD: ${CUSTOMER_DB_PASSWORD:?Run init-local.sh}
+      JWT_PUBLIC_KEY: file:/run/secrets/jwt_public
+    secrets:
+      - jwt_public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    mem_limit: 768m
+    cpus: 1.0
+    stop_grace_period: 30s
+    cap_drop:
+      - ALL
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    image: devops-lab/order-service:local
+    environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:postgresql://postgres:5432/order_db
+      DB_USER: order_app
+      DB_PASSWORD: ${ORDER_DB_PASSWORD:?Run init-local.sh}
+      JWT_PUBLIC_KEY: file:/run/secrets/jwt_public
+      CUSTOMER_BASE_URL: http://customer-service:8080
+    secrets:
+      - jwt_public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    mem_limit: 768m
+    cpus: 1.0
+    stop_grace_period: 30s
+    cap_drop:
+      - ALL
+volumes:
+  postgres-data:
+secrets:
+  jwt_public:
+    file: ./.secrets/public.pem
+  jwt_private:
+    file: ./.secrets/private.pem
