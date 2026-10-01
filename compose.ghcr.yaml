@@ -1,0 +1,9 @@
+services:
+  api-gateway:
+    image: ghcr.io/castrese991/devops-azure-lab/api-gateway:${LAB_IMAGE_TAG:?Impostare LAB_IMAGE_TAG}
+  auth-service:
+    image: ghcr.io/castrese991/devops-azure-lab/auth-service:${LAB_IMAGE_TAG:?Impostare LAB_IMAGE_TAG}
+  customer-service:
+    image: ghcr.io/castrese991/devops-azure-lab/customer-service:${LAB_IMAGE_TAG:?Impostare LAB_IMAGE_TAG}
+  order-service:
+    image: ghcr.io/castrese991/devops-azure-lab/order-service:${LAB_IMAGE_TAG:?Impostare LAB_IMAGE_TAG}
