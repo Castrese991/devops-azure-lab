@@ -305,6 +305,7 @@ Additional documentation is available under `docs/`:
 - `04-INCIDENT-PROTOCOL.md` — troubleshooting practice protocol
 - `05-LOCAL-OPERATIONS.md` — local operations runbook
 - `VALIDATION.md` — verified test scope
+- `PORTFOLIO.md` — portfolio case study and presentation copy
 
 ---
 
