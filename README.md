@@ -1,118 +1,314 @@
-# DevOps Azure Lab — v0.1
+# Java Microservices Cloud Platform
 
-Laboratorio reale per Castrese: Java 17, Spring Boot 3.5.16, Spring Cloud
-2025.0.3, Maven, PostgreSQL 16. Quattro processi e quattro immagini indipendenti.
-Nessun Kafka/RabbitMQ. Nessun incidente inserito.
+Production-style backend platform built with **Java 17**, **Spring Boot**, **Spring Security**, **JWT**, **PostgreSQL**, **Docker**, and **GitHub Actions**.
 
-## Avvio locale (Ubuntu)
+This project demonstrates how a small microservices system can be designed, secured, tested, containerized, and prepared for Kubernetes and Azure deployment.
 
-Prerequisiti: Docker Engine con permesso di esecuzione, plugin Docker Compose v2
-con `--wait`, OpenSSL, Python 3, curl. Consigliati almeno 6 GB di RAM disponibili
-per Docker; la prima build richiede rete e tempo per scaricare le immagini.
-Non serve installare Java/Maven per usare Compose.
+## Highlights
 
-```bash
-docker --version
-docker compose version
-bash scripts/init-local.sh
-bash scripts/test.sh
-docker compose up -d --build --wait --wait-timeout 240
-python3 scripts/smoke-test.py
-docker compose ps
+- Four independently deployable Spring Boot services
+- API Gateway as the single local entry point
+- Stateless authentication with RSA-signed JWTs
+- BCrypt password hashing
+- PostgreSQL with isolated application databases and roles
+- Flyway-managed database migrations
+- Docker Compose orchestration with health checks and resource limits
+- End-to-end HTTP smoke testing against the complete stack
+- GitHub Actions CI pipeline for tests, integration checks, container builds, and GHCR publishing
+- Request correlation with `X-Request-ID`
+- Liveness and readiness endpoints with Spring Boot Actuator
+- Non-root application containers with Linux capabilities dropped
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Client[Client] --> Gateway[API Gateway]
+
+    Gateway --> Auth[Auth Service]
+    Gateway --> Customer[Customer Service]
+    Gateway --> Order[Order Service]
+
+    Order -->|Validate customer| Customer
+
+    Auth --> AuthDB[(auth_db)]
+    Customer --> CustomerDB[(customer_db)]
+    Order --> OrderDB[(order_db)]
+
+    subgraph PostgreSQL 16
+        AuthDB
+        CustomerDB
+        OrderDB
+    end
 ```
 
-Lo smoke test fallisce al primo risultato inatteso; crea un cliente e un ordine
-con dati di laboratorio e li lascia nel database. Può essere ripetuto.
-La directory `.secrets` e `.env` vengono creati una volta e sono esclusi da Git.
-Non condividere `.env`, chiavi private o token.
+The gateway exposes the platform locally on `http://localhost:8088`. Application services and PostgreSQL remain internal to the Docker network.
 
-Il gateway è raggiungibile solo da questo computer: http://localhost:8088.
-PostgreSQL e i tre servizi non espongono porte sull'host.
+## Services
+
+| Service | Responsibility |
+|---|---|
+| `api-gateway` | Spring Cloud Gateway routing, request correlation, timeouts, health endpoint |
+| `auth-service` | Account bootstrap, BCrypt password verification, RSA-signed JWT issuance |
+| `customer-service` | Customer REST API, validation, persistence and pagination |
+| `order-service` | Order REST API, customer validation through service-to-service HTTP, persistence |
+
+## Tech Stack
+
+**Backend**
+
+- Java 17
+- Spring Boot 3.5
+- Spring Cloud Gateway
+- Spring Security / OAuth2 Resource Server
+- Spring Data JPA / Hibernate
+- Flyway
+- Maven
+
+**Data & Infrastructure**
+
+- PostgreSQL 16
+- Docker
+- Docker Compose
+- GitHub Actions
+- GitHub Container Registry
+
+**Testing & Operations**
+
+- JUnit
+- H2 in PostgreSQL compatibility mode for selected tests
+- Real PostgreSQL integration flow through Docker Compose
+- Python standard-library smoke test
+- Spring Boot Actuator
+- Structured request correlation
+
+## Security Design
+
+Authentication is handled by `auth-service`.
+
+- Passwords are stored as BCrypt hashes.
+- Access tokens are signed with RSA using RS256.
+- Resource services validate the token signature, issuer, audience, expiration, and required `lab` scope.
+- The private RSA key is mounted only into the authentication service.
+- Local secrets and generated credentials live in `.env` and `.secrets/`, both excluded from Git.
+- Database application users are separated by service.
+- Only the API Gateway publishes a host port in the default local configuration.
+
+This repository intentionally contains no real credentials, private keys, or production secrets.
+
+## API Flow
+
+A typical authenticated flow is:
+
+1. Authenticate with `POST /api/auth/login`.
+2. Receive a short-lived Bearer token.
+3. Create or query customers through the gateway.
+4. Create an order using a valid `customerId`.
+5. `order-service` validates the customer through `customer-service` before persisting the order.
+
+The platform deliberately avoids a cross-service database foreign key and does not open a database transaction while waiting on remote HTTP I/O.
+
+## Testing
+
+The Java test suite currently contains **21 automated tests** covering:
+
+- Gateway routing
+- Authentication and JWT behavior
+- Customer API behavior and persistence
+- Order API behavior and persistence
+- Service-to-service customer validation
+- Error handling for remote failures
+- Flyway migrations in the test environment
+
+Run the Java test suite with:
 
 ```bash
+mvn -B -ntp verify
+```
+
+The repository also includes an end-to-end smoke test that exercises the running Docker stack with real PostgreSQL, authentication, customer creation, and order creation:
+
+```bash
+python3 scripts/smoke-test.py
+```
+
+See `docs/VALIDATION.md` for the recorded validation scope.
+
+## CI/CD
+
+The GitHub Actions workflow in `.github/workflows/ci.yml` performs the following pipeline:
+
+```text
+Maven verify
+    ↓
+Build and start complete Docker Compose stack
+    ↓
+Run end-to-end smoke test
+    ↓
+Build service container images
+    ↓
+Publish images to GHCR on push/tag
+```
+
+Container images are built independently for:
+
+- `api-gateway`
+- `auth-service`
+- `customer-service`
+- `order-service`
+
+Release tags follow the `v*` convention.
+
+## Quick Start
+
+### Prerequisites
+
+- Docker Engine
+- Docker Compose v2
+- OpenSSL
+- Python 3
+- curl
+
+Java and Maven are not required when the platform is started only through Docker Compose.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Castrese991/devops-azure-lab.git
+cd devops-azure-lab
+```
+
+### 2. Generate local credentials and RSA keys
+
+```bash
+bash scripts/init-local.sh
+```
+
+The script creates local-only `.env` and `.secrets/` files.
+
+### 3. Start the complete stack
+
+```bash
+docker compose up -d --build --wait --wait-timeout 240
+```
+
+### 4. Run the end-to-end smoke test
+
+```bash
+python3 scripts/smoke-test.py
+```
+
+### 5. Inspect the platform
+
+```bash
+docker compose ps
 curl -i http://localhost:8088/actuator/health/readiness
 docker compose logs --tail=100 order-service
-docker compose logs --tail=100 customer-service
-docker compose stop
-docker compose start
 ```
 
-`docker compose down` elimina i container e conserva il volume dati.
-**`docker compose down -v` cancella tutti i dati del laboratorio.** Non usarlo
-per risolvere genericamente un problema. Le credenziali DB vengono applicate
-solo all'inizializzazione del volume; cambiare `.env` non cambia le password già
-memorizzate in PostgreSQL. Anche l'utente bootstrap viene creato una sola volta.
+### 6. Stop the environment
 
-## Architettura e repository
+```bash
+docker compose stop
+```
 
-Monorepo Maven: root aggregatore e un modulo per servizio. Ogni servizio ha
-`pom.xml`, `Dockerfile`, `src/main/java`, `src/main/resources`, `src/test`.
+Use `docker compose down` when you want to remove containers while keeping the PostgreSQL volume.
 
-| Percorso | Contenuto |
-|---|---|
-| `api-gateway/` | Spring Cloud Gateway WebFlux, tre route, timeout, Actuator |
-| `auth-service/` | Login, account PostgreSQL, BCrypt, firma JWT RSA |
-| `customer-service/` | REST clienti, DTO validati, JPA, Flyway |
-| `order-service/` | REST ordini, chiamata HTTP autenticata al customer, JPA |
-| `infra/postgres/` | Inizializzazione tre ruoli/database |
-| `scripts/` | Setup segreti locali, test, smoke test HTTP |
-| `.github/workflows/ci.yml` | Build, test, Compose/PostgreSQL, immagini GHCR |
-| `docs/` | API, lettura del codice, workflow e percorso Azure |
+> `docker compose down -v` deletes the local database volume and all laboratory data.
 
-Il gateway mantiene path e header Authorization. I servizi verificano firma,
-issuer, audience, scadenza e scope del token. Non fidarsi della sola presenza del
-gateway. Il database auth contiene solo hash BCrypt, non password in chiaro.
-Token con durata predefinita 15 minuti; l'account operatore ha scope `lab`.
-Questa è una piccola applicazione per operatori interni, non un negozio multiutente:
-gli operatori autorizzati possono vedere tutti i clienti e gli ordini.
+## Observability
 
-L'ordine contiene customerId senza foreign key cross-service. Il customer viene
-verificato prima del salvataggio; non esiste una transazione distribuita.
-La v0.1 non elimina clienti, non espone aggiornamenti né pagamenti.
-L'importo è un totale inserito dall'operatore, sempre EUR; non un prezzo catalogo.
-Le liste hanno paginazione `page` e `size` (massimo 100), ordinate per ID.
-POST ordini non è idempotente: non ripetere automaticamente richieste dopo timeout.
+Each application exposes:
 
-Tre database su una sola istanza PostgreSQL riducono le risorse locali; ogni
-servizio accede al proprio database con un ruolo dedicato senza privilegi superuser.
-Il ruolo amministrativo serve solo all'inizializzazione. Flyway crea le tabelle;
-Hibernate valida lo schema, non lo modifica.
+- `/actuator/health/liveness`
+- `/actuator/health/readiness`
 
-## Health e osservabilità
+Request logs include:
 
-- Liveness: `/actuator/health/liveness`, verifica stato del processo.
-- Readiness: `/actuator/health/readiness`, include DB nei servizi applicativi.
-- La liveness non dipende dal DB per evitare restart inutili durante un guasto DB.
-- La readiness di order non dipende da customer: gli ordini già salvati restano leggibili.
-- Readiness gateway verifica il gateway, non certifica tutto il percorso applicativo.
-- Solo health e info esposti da Actuator; niente dettagli DB pubblici.
-- Log richieste: requestId, metodo, path, status, durata. Nessun body o token nei log.
-- Order propaga X-Request-ID al customer per correlare la chiamata.
-- Niente retry automatici dei POST; connect timeout 2 s, read timeout 3 s verso customer.
+- request ID
+- HTTP method
+- path
+- response status
+- request duration
 
-## Test e limiti di validazione
+Sensitive request bodies and Bearer tokens are not intentionally logged.
 
-`mvn -B verify` esegue test JWT/login, API e persistenza H2, routing del gateway e
-client REST contro server HTTP effettivo. H2 in modalità PostgreSQL verifica parte
-delle migrazioni e della persistenza, ma **non sostituisce PostgreSQL**.
-Lo smoke test Compose e la pipeline eseguono il percorso completo con PostgreSQL,
-bootstrap credenziali, Flyway e JWT reali. Vedere `docs/VALIDATION.md` per i risultati
-effettivamente verificati nell'ambiente di preparazione.
+`order-service` propagates `X-Request-ID` to `customer-service`, making it possible to correlate the cross-service request path in logs.
 
-Il Dockerfile salta i test perché la pipeline li esegue prima; una build manuale
-con `docker compose up --build` da sola non esegue test. Usare `scripts/test.sh`.
+## Repository Structure
 
-## Versioni e prossime fasi
+```text
+.
+├── api-gateway/
+├── auth-service/
+├── customer-service/
+├── order-service/
+├── infra/
+│   └── postgres/
+├── scripts/
+├── docs/
+├── compose.yaml
+├── compose.ghcr.yaml
+├── pom.xml
+└── .github/workflows/ci.yml
+```
 
-Boot 3.5 è scelto come baseline didattica coerente con lo stack 3.x; la linea
-3.5 ha terminato le release OSS. Prima di esporre il laboratorio su Azure,
-aggiorneremo a una linea supportata e controlleremo dipendenze e immagini.
-Le immagini base sono fissate per versione/tag ma non per digest: prima della
-baseline cloud bloccheremo i digest e automatizzeremo gli aggiornamenti.
+## Current Status
 
-La v0.1 non è una produzione esposta a Internet: mancano TLS, gestione credenziali
-centralizzata, rate limiting del login, rotazione delle chiavi, backup verificati,
-tracing e alert. Questi passaggi sono parte del percorso, non funzioni già presenti.
-Nessuna risorsa Azure e nessun repository remoto sono creati da questo archivio.
+### Implemented
 
-Inizia da `docs/01-FILE-GUIDE.md`, poi `docs/02-API.md` e `docs/03-ROADMAP.md`.
+- Java/Spring Boot microservices
+- REST APIs
+- Spring Security
+- RSA JWT authentication
+- PostgreSQL
+- Flyway migrations
+- Docker / Docker Compose
+- Health checks
+- End-to-end smoke testing
+- GitHub Actions CI
+- GHCR image build/publishing workflow
+
+### In progress / planned
+
+- Local Kubernetes deployment
+- Azure Container Registry
+- Azure Kubernetes Service
+- Azure Monitor
+- Log Analytics
+- Application Insights
+- TLS and DNS
+- Managed secrets
+- Production-grade alerting and distributed tracing
+
+Kubernetes and Azure are intentionally listed as roadmap items until the corresponding deployment is implemented and verified.
+
+## Engineering Decisions
+
+A few design choices are intentional:
+
+- Each service owns its persistence boundary.
+- Database credentials are separated by service.
+- The gateway is not treated as the only security boundary; downstream services validate JWTs independently.
+- Liveness is kept independent from database availability to avoid unnecessary restart loops.
+- `order-service` does not automatically retry POST operations.
+- Remote customer validation happens before order persistence.
+- The local setup favors reproducibility and troubleshooting over production infrastructure complexity.
+
+## Documentation
+
+Additional documentation is available under `docs/`:
+
+- `01-FILE-GUIDE.md` — codebase walkthrough
+- `02-API.md` — API examples
+- `03-ROADMAP.md` — local → Kubernetes → Azure roadmap
+- `04-INCIDENT-PROTOCOL.md` — troubleshooting practice protocol
+- `05-LOCAL-OPERATIONS.md` — local operations runbook
+- `VALIDATION.md` — verified test scope
+- `PORTFOLIO.md` — portfolio case study and presentation copy
+
+---
+
+### Project purpose
+
+This is a personal engineering project built to demonstrate practical backend, microservices, containerization, CI/CD, security, and cloud-readiness skills with a reproducible codebase rather than a purely theoretical example.
